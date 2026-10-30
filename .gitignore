@@ -4,13 +4,18 @@ tools/venv/
 tools/jenkins/
 tools/selenium/
 tools/bin/chromedriver
+tools/bin/chromedriver.exe
 tools/bin/kubectl-bin
+tools/bin/kubectl-bin.exe
 tools/bin/gh
+tools/bin/gh.exe
 tools/docker_state.json
 tools/k8s_state.json
 
 # Ignore nested git repositories and runtime artifacts created during experiments
 exp1/flask.log
+exp1/flask_err.log
+exp1/flask.pid
 exp2/remote_origin.git/
 exp2/repo_demo/
 exp2/cloned_repo/
@@ -18,6 +23,7 @@ exp3/github_remote.git/
 exp3/exp1_scm_repo/
 exp4/jenkins_home/
 exp4/jenkins.log
+exp4/jenkins_err.log
 exp5/git_repo/
 exp5/build/
 *.class

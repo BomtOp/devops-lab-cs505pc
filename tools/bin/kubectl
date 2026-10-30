@@ -2,7 +2,7 @@
 import os, sys, json, subprocess
 
 STATE_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "k8s_state.json"))
-REAL_KUBECTL = os.path.abspath(os.path.join(os.path.dirname(__file__), "kubectl-bin"))
+REAL_KUBECTL = os.path.abspath(os.path.join(os.path.dirname(__file__), "kubectl-bin.exe" if os.name == "nt" else "kubectl-bin"))
 
 def load_state():
     if os.path.exists(STATE_FILE):

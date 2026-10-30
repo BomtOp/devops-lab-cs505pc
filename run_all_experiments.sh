@@ -84,6 +84,11 @@ java -ea -cp "$CP" Main 2>/dev/null
 echo "=================================================================="
 echo "  EXPERIMENT 12: SELENIUM TEST CASES FOR CONTAINERIZED APP        "
 echo "=================================================================="
+if ! curl -s http://localhost:8080/ > /dev/null 2>&1; then
+  "$ROOT_DIR/tools/venv/bin/python" "$ROOT_DIR/exp1/app.py" > "$ROOT_DIR/exp1/flask.log" 2>&1 &
+  FLASK_PID=$!
+  sleep 2
+fi
 cd "$ROOT_DIR/exp12"
 javac -cp "$CP" Main.java
 java -ea -Dapp.url=http://localhost:8080 -cp "$CP" Main 2>/dev/null
