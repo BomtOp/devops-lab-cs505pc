@@ -1,0 +1,24 @@
+# Ignore large downloaded binaries, JDK, virtual environments, and runtime logs
+tools/jdk/
+tools/venv/
+tools/jenkins/
+tools/selenium/
+tools/bin/chromedriver
+tools/bin/kubectl-bin
+tools/bin/gh
+tools/docker_state.json
+tools/k8s_state.json
+
+# Ignore nested git repositories and runtime artifacts created during experiments
+exp1/flask.log
+exp2/remote_origin.git/
+exp2/repo_demo/
+exp2/cloned_repo/
+exp3/github_remote.git/
+exp3/exp1_scm_repo/
+exp4/jenkins_home/
+exp4/jenkins.log
+exp5/git_repo/
+exp5/build/
+*.class
+.DS_Store

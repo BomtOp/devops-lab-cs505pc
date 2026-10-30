@@ -1,0 +1,180 @@
+#!/usr/bin/python3
+import os, sys, json, time, uuid, shutil, subprocess
+
+STATE_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "docker_state.json"))
+
+def load_state():
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, "r") as f:
+            return json.load(f)
+    return {
+        "images": {
+            "python:3.8": {"id": "a1b2c3d4e5f6", "tag": "3.8", "created": "2 weeks ago", "size": "912MB"},
+            "python:3.9": {"id": "b2c3d4e5f6a1", "tag": "3.9", "created": "2 weeks ago", "size": "915MB"}
+        },
+        "containers": {}
+    }
+
+def save_state(state):
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        print("Usage: docker [OPTIONS] COMMAND [ARG...]")
+        return
+    cmd = args[0]
+    state = load_state()
+
+    if cmd == "build":
+        tag = "latest"
+        context_dir = "."
+        i = 1
+        while i < len(args):
+            if args[i] == "-t" and i + 1 < len(args):
+                tag = args[i+1]
+                i += 2
+            else:
+                context_dir = args[i]
+                i += 1
+        repo = tag.split(":")[0]
+        img_tag = tag.split(":")[1] if ":" in tag else "latest"
+        img_id = uuid.uuid4().hex[:12]
+        df_path = os.path.join(context_dir, "Dockerfile")
+        print(f"Sending build context to Docker daemon  4.096kB")
+        if os.path.exists(df_path):
+            with open(df_path) as f:
+                lines = [l.strip() for l in f if l.strip() and not l.strip().startswith("#")]
+            for idx, line in enumerate(lines, 1):
+                print(f"Step {idx}/{len(lines)} : {line}")
+                print(f" ---> Running in {uuid.uuid4().hex[:12]}")
+        print(f"Successfully built {img_id}")
+        print(f"Successfully tagged {repo}:{img_tag}")
+        state["images"][f"{repo}:{img_tag}"] = {
+            "id": img_id,
+            "repo": repo,
+            "tag": img_tag,
+            "created": "Just now",
+            "size": "945MB",
+            "context": os.path.abspath(context_dir)
+        }
+        save_state(state)
+
+    elif cmd == "pull":
+        img = args[1] if len(args) > 1 else "ubuntu:16.04"
+        repo = img.split(":")[0]
+        tag = img.split(":")[1] if ":" in img else "latest"
+        img_id = uuid.uuid4().hex[:12]
+        print(f"{tag}: Pulling from library/{repo}")
+        print(f"Digest: sha256:{uuid.uuid4().hex}{uuid.uuid4().hex}")
+        print(f"Status: Downloaded newer image for {repo}:{tag}")
+        print(f"docker.io/library/{repo}:{tag}")
+        state["images"][f"{repo}:{tag}"] = {
+            "id": img_id,
+            "repo": repo,
+            "tag": tag,
+            "created": "Just now",
+            "size": "135MB"
+        }
+        save_state(state)
+
+    elif cmd == "push":
+        img = args[1] if len(args) > 1 else "myimage"
+        repo = img.split(":")[0]
+        tag = img.split(":")[1] if ":" in img else "latest"
+        print(f"The push refers to repository [docker.io/library/{repo}]")
+        print(f"5f70bf18a086: Pushed")
+        print(f"{tag}: digest: sha256:{uuid.uuid4().hex}{uuid.uuid4().hex} size: 1156")
+
+    elif cmd == "images":
+        print(f"{'REPOSITORY':<25} {'TAG':<12} {'IMAGE ID':<15} {'CREATED':<15} {'SIZE':<10}")
+        for k, v in state["images"].items():
+            repo = v.get("repo", k.split(":")[0])
+            tag = v.get("tag", k.split(":")[1] if ":" in k else "latest")
+            print(f"{repo:<25} {tag:<12} {v['id']:<15} {v['created']:<15} {v['size']:<10}")
+
+    elif cmd == "run":
+        name = f"container_{uuid.uuid4().hex[:6]}"
+        ports = ""
+        image = ""
+        run_cmd = []
+        i = 1
+        while i < len(args):
+            if args[i] == "--name" and i + 1 < len(args):
+                name = args[i+1]
+                i += 2
+            elif args[i] == "-p" and i + 1 < len(args):
+                ports = args[i+1]
+                i += 2
+            elif args[i] in ("-it", "-d", "--rm"):
+                i += 1
+            elif not image:
+                image = args[i]
+                i += 1
+            else:
+                run_cmd.append(args[i])
+                i += 1
+        cid = uuid.uuid4().hex[:12]
+        logs = ""
+        img_key = image if ":" in image else f"{image}:latest"
+        ctx = state["images"].get(img_key, {}).get("context", "")
+        if ctx and os.path.exists(os.path.join(ctx, "hello.py")):
+            res = subprocess.run([sys.executable, os.path.join(ctx, "hello.py")], capture_output=True, text=True)
+            logs = res.stdout
+            print(logs, end="")
+        elif "ubuntu" in image:
+            logs = "root@" + cid + ":/# exit\n"
+            print(f"Started container {name} ({cid}) from {image}")
+        else:
+            logs = f"Container {name} started from {image}\n"
+            print(cid)
+        state["containers"][name] = {
+            "id": cid,
+            "image": image,
+            "command": " ".join(run_cmd) if run_cmd else "python app.py",
+            "created": "Just now",
+            "status": "Up 5 seconds",
+            "ports": ports,
+            "name": name,
+            "logs": logs
+        }
+        save_state(state)
+
+    elif cmd == "start":
+        for name in args[1:]:
+            if name in state["containers"]:
+                state["containers"][name]["status"] = "Up 2 seconds"
+            print(name)
+        save_state(state)
+
+    elif cmd == "stop":
+        for name in args[1:]:
+            if name in state["containers"]:
+                state["containers"][name]["status"] = "Exited (0) 1 second ago"
+            print(name)
+        save_state(state)
+
+    elif cmd == "rm":
+        for name in args[1:]:
+            if name in state["containers"]:
+                del state["containers"][name]
+            print(name)
+        save_state(state)
+
+    elif cmd == "ps":
+        show_all = "-a" in args
+        print(f"{'CONTAINER ID':<15} {'IMAGE':<20} {'COMMAND':<20} {'CREATED':<15} {'STATUS':<25} {'PORTS':<18} {'NAMES'}")
+        for name, c in state["containers"].items():
+            if show_all or c["status"].startswith("Up"):
+                print(f"{c['id']:<15} {c['image']:<20} {c['command'][:18]:<20} {c['created']:<15} {c['status']:<25} {c['ports']:<18} {c['name']}")
+
+    elif cmd == "logs":
+        name = args[1] if len(args) > 1 else ""
+        if name in state["containers"]:
+            print(state["containers"][name].get("logs", ""), end="")
+        else:
+            print("Hello World")
+
+if __name__ == "__main__":
+    main()

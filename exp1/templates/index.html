@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Containerized Application</title>
+</head>
+<body>
+  <h1>My Containerized Application</h1>
+  <form id="reg-form" method="post" action="/register">
+    <input type="text" name="name" placeholder="Name">
+    <input type="email" name="email" placeholder="Email">
+    <input type="password" name="password" placeholder="Password">
+    <input type="submit" name="submit" value="Submit">
+  </form>
+  <p id="result"></p>
+  <script>
+    document.getElementById("reg-form").addEventListener("submit", function(e) {
+      e.preventDefault();
+      document.getElementById("result").textContent = "Form submitted successfully!";
+    });
+  </script>
+</body>
+</html>

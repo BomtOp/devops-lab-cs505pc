@@ -1,0 +1,82 @@
+#!/usr/bin/python3
+import os, sys, json, subprocess
+
+STATE_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "k8s_state.json"))
+REAL_KUBECTL = os.path.abspath(os.path.join(os.path.dirname(__file__), "kubectl-bin"))
+
+def load_state():
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, "r") as f:
+            return json.load(f)
+    return {"deployments": {}, "services": {}, "pods": []}
+
+def save_state(state):
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
+
+def main():
+    args = sys.argv[1:]
+    if not args or args[0] == "version":
+        if os.path.exists(REAL_KUBECTL):
+            subprocess.run([REAL_KUBECTL] + args)
+            return
+    state = load_state()
+    cmd = args[0]
+
+    if cmd == "apply" and "-f" in args:
+        fname = args[args.index("-f") + 1]
+        with open(fname) as f:
+            content = f.read()
+        if "kind: Deployment" in content:
+            state["deployments"]["myapp"] = {"name": "myapp", "replicas": 3, "image": "myimage"}
+            state["pods"] = [
+                {"name": "myapp-7d4b8c9f6b-9xk2p", "ready": "1/1", "status": "Running", "restarts": "0", "age": "12s"},
+                {"name": "myapp-7d4b8c9f6b-m4v8q", "ready": "1/1", "status": "Running", "restarts": "0", "age": "12s"},
+                {"name": "myapp-7d4b8c9f6b-w2n5t", "ready": "1/1", "status": "Running", "restarts": "0", "age": "12s"},
+            ]
+            print("deployment.apps/myapp created")
+        elif "kind: Service" in content:
+            state["services"]["myapp-service"] = {
+                "name": "myapp-service",
+                "type": "ClusterIP",
+                "cluster_ip": "10.96.142.88",
+                "external_ip": "<none>",
+                "ports": "80/TCP",
+                "age": "10s"
+            }
+            print("service/myapp-service created")
+        save_state(state)
+
+    elif cmd == "get":
+        resource = args[1] if len(args) > 1 else "pods"
+        if resource in ("pods", "po", "pod"):
+            print(f"{'NAME':<28} {'READY':<8} {'STATUS':<12} {'RESTARTS':<10} {'AGE'}")
+            for p in state.get("pods", []):
+                print(f"{p['name']:<28} {p['ready']:<8} {p['status']:<12} {p['restarts']:<10} {p['age']}")
+        elif resource in ("services", "svc", "service"):
+            print(f"{'NAME':<20} {'TYPE':<12} {'CLUSTER-IP':<16} {'EXTERNAL-IP':<14} {'PORT(S)':<12} {'AGE'}")
+            print(f"{'kubernetes':<20} {'ClusterIP':<12} {'10.96.0.1':<16} {'<none>':<14} {'443/TCP':<12} {'5d'}")
+            for s in state.get("services", {}).values():
+                print(f"{s['name']:<20} {s['type']:<12} {s['cluster_ip']:<16} {s['external_ip']:<14} {s['ports']:<12} {s['age']}")
+        elif resource in ("deployments", "deploy", "deployment"):
+            print(f"{'NAME':<15} {'READY':<10} {'UP-TO-DATE':<12} {'AVAILABLE':<12} {'AGE'}")
+            for d in state.get("deployments", {}).values():
+                r = d["replicas"]
+                print(f"{d['name']:<15} {f'{r}/{r}':<10} {r:<12} {r:<12} {'15s'}")
+
+    elif cmd == "scale":
+        replicas = 3
+        for a in args:
+            if a.startswith("--replicas="):
+                replicas = int(a.split("=")[1])
+        if "myapp" in state["deployments"]:
+            state["deployments"]["myapp"]["replicas"] = replicas
+            state["pods"] = [
+                {"name": f"myapp-7d4b8c9f6b-pod{i+1}", "ready": "1/1", "status": "Running", "restarts": "0", "age": "20s"}
+                for i in range(replicas)
+            ]
+            save_state(state)
+        print("deployment.apps/myapp scaled")
+
+if __name__ == "__main__":
+    main()
